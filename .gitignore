@@ -1,0 +1,5 @@
+/*.env
+/migrations
+/.idea
+/*go.mod
+/*go.sum
