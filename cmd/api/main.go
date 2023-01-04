@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/asd/asd/internal/data"
+	"github.com/asd/asd/internal/jsonlog"
 	"github.com/joho/godotenv"
 	"log"
 	"net/http"
@@ -33,7 +34,7 @@ type config struct {
 
 type application struct {
 	config config
-	logger *log.Logger
+	logger *jsonlog.Logger
 	models data.Models
 }
 
@@ -55,39 +56,44 @@ func main() {
 	flag.StringVar(&cfg.db.maxIdleTime, "db-max-idle-time", "15m", "PostgreSQL max connection idle time")
 
 	flag.Parse() // give our config file values
-	logger := log.New(os.Stdout, "", log.Ldate|log.Ltime)
+
+	logger := jsonlog.New(os.Stdout, jsonlog.LevelInfo)
 
 	// connecting database
 	db, err := openDB(cfg)
 	if err != nil {
-		logger.Fatal(err)
+		logger.PrintFatal(err, nil)
 	}
 	defer db.Close()
-	logger.Printf("database connection pool established")
+	logger.PrintInfo("database connection pool established", nil)
 
 	//******************************************************************************
 	migrationDriver, err := postgres.WithInstance(db, &postgres.Config{})
 	if err != nil {
-		logger.Fatal(err, nil)
+		logger.PrintFatal(err, nil)
 	}
 	migrator, err := migrate.NewWithDatabaseInstance("file://migrations", "greenlight", migrationDriver)
 	if err != nil {
-		logger.Fatal(err, nil)
+		logger.PrintFatal(err, nil)
 	}
 	err = migrator.Up()
 	if err != nil && err != migrate.ErrNoChange {
-		logger.Fatal(err, nil)
+		logger.PrintFatal(err, nil)
 	}
-	logger.Printf("database migrations applied")
+	logger.PrintInfo("database migrations applied", nil)
 
 	version, _, err := migrator.Version()
 	if err != nil && err != migrate.ErrNoChange {
-		logger.Fatal(err, nil)
+		logger.PrintFatal(err, nil)
 	} else if version > 10 {
-		logger.Fatal("Version must not be bigger than 10!")
+		logger.PrintFatal(nil, map[string]string{
+			"message": "Version is bigger than 10!",
+		})
 	}
 
-	logger.Printf("Your current version is %v", version)
+	// TODO: print fatal for version checker
+
+	logger.PrintInfo(fmt.Sprintf("Your current version is %v", version), nil)
 	//******************************************************************************
 
 	app := &application{
@@ -99,14 +105,18 @@ func main() {
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%d", cfg.port),
 		Handler:      app.routes(),
+		ErrorLog:     log.New(logger, "", 0),
 		IdleTimeout:  time.Minute,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 30 * time.Second,
 	}
 
-	logger.Printf("starting %s server on %s", cfg.env, srv.Addr)
+	logger.PrintInfo("starting server", map[string]string{
+		"addr": srv.Addr,
+		"env":  cfg.env,
+	})
 	err = srv.ListenAndServe()
-	logger.Fatal(err)
+	logger.PrintFatal(err, nil)
 }
 
 func openDB(cfg config) (*sql.DB, error) {

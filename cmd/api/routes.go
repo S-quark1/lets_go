@@ -6,7 +6,7 @@ import (
 	"github.com/julienschmidt/httprouter"
 )
 
-func (app *application) routes() *httprouter.Router {
+func (app *application) routes() http.Handler {
 	// Initialize a new httprouter router instance.
 	router := httprouter.New()
 	router.NotFound = http.HandlerFunc(app.notFoundResponse)
@@ -29,7 +29,9 @@ func (app *application) routes() *httprouter.Router {
 	router.HandlerFunc(http.MethodGet, "/v1/actors/:id", app.showActorsHandler)
 
 	// trailers
+	router.HandlerFunc(http.MethodGet, "/v1/trailers", app.listTrailersHandler)
 	router.HandlerFunc(http.MethodPost, "/v1/trailers", app.createTrailerHandler)
 
-	return router
+	// Wrap the router with the panic recovery middleware.
+	return app.recoverPanic(router)
 }

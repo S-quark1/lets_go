@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/asd/asd/internal/data"
+	"github.com/asd/asd/internal/validator"
 	"net/http"
 )
 
@@ -40,6 +41,41 @@ func (app *application) createTrailerHandler(w http.ResponseWriter, r *http.Requ
 	// Write a JSON response with a 201 Created status code, the movie data in the
 	// response body, and the Location header.
 	err = app.writeJSON(w, http.StatusCreated, envelope{"trailer": trailer}, nil)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+	}
+}
+
+func (app *application) listTrailersHandler(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		TrailerName string
+		data.Filters
+	}
+	// Initialize a new Validator instance.
+	v := validator.New()
+	// Call r.URL.Query() to get the url.Values map containing the query string data.
+	qs := r.URL.Query()
+
+	input.TrailerName = app.readString(qs, "trailer_name", "")
+
+	input.Filters.Page = app.readInt(qs, "page", 1, v)
+	input.Filters.PageSize = app.readInt(qs, "page_size", 20, v)
+
+	input.Filters.Sort = app.readString(qs, "sort", "id")
+	input.Filters.SortSafelist = []string{"id", "trailer_name", "duration", "premier_date", "-id", "-trailer_name", "-duration", "-premier_date"}
+
+	if data.ValidateFilters(v, input.Filters); !v.Valid() {
+		app.failedValidationResponse(w, r, v.Errors)
+		return
+	}
+
+	trailers, err := app.models.Trailers.GetAll(input.TrailerName, input.Filters)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+
+	err = app.writeJSON(w, http.StatusOK, envelope{"trailers": trailers}, nil)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 	}

@@ -13,7 +13,12 @@ func (app *application) failedValidationResponse(w http.ResponseWriter, r *http.
 
 // The logError() method is a generic helper for logging an error message.
 func (app *application) logError(r *http.Request, err error) {
-	app.logger.Print(err)
+	// Use the PrintError() method to log the error message, and include the current
+	// request method and URL as properties in the log entry.
+	app.logger.PrintError(err, map[string]string{
+		"request_method": r.Method,
+		"request_url":    r.URL.String(),
+	})
 }
 
 // The errorResponse() method is a generic helper for sending JSON-formatted error
