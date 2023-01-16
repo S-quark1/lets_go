@@ -32,6 +32,11 @@ func (app *application) routes() http.Handler {
 	router.HandlerFunc(http.MethodGet, "/v1/trailers", app.listTrailersHandler)
 	router.HandlerFunc(http.MethodPost, "/v1/trailers", app.createTrailerHandler)
 
+	// users
+	//router.HandlerFunc(http.MethodGet, "/v1/trailers", app.listTrailersHandler)
+	router.HandlerFunc(http.MethodPost, "/v1/users", app.registerUserHandler)
+	router.HandlerFunc(http.MethodPut, "/v1/users/activated", app.activateUserHandler)
+
 	// Wrap the router with the panic recovery middleware.
 	return app.recoverPanic(router)
 }
